@@ -27,7 +27,7 @@ m_original = m;
 Fi = Finternal(m, 'plot_or_not', false);
 
 % Other parameter recommendations:
-mu = 200;
+mu = 100;
 
 % Parameters for volume and surface area forces
 targetVolume = 0.6 * sum(Volume(m_original)); % Set your target volume here
