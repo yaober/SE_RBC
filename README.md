@@ -37,9 +37,9 @@ The simulation runs through all combinations of `k_c`, `kv`, and `ks` values. Fo
    u = ComUnit('erg', ComUnit.nm_to_cm(1000), 300, ComUnit.kBT_to_erg(10, 300));
    m = ModMembrane(2, 'unit', u);
    m.pm.Vdh.V0 = 0.1;
-   m.pm.k_c = k_c;
-   m.pm.k_V = 4;
-   m.pm.k_A = 8;
+   m.pm.k_c = 5;
+   m.pm.k_V = 16;
+   m.pm.k_A = 32;
    m.pm.k_P = 0;
    ```
 2. **Calculate internal force**:
