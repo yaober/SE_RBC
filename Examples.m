@@ -1,43 +1,95 @@
-%% requirements:
-% 1. gcc for compiling c codes. Load before starting Matlab:
-%    module load gcc/6.3.0
-% 2. Use Matlab 2020a
-%% Setup the directory where the membrane object is located and add the directory to Matlab's function pool 
-dir_mod = '/home2/s171152/codes/matlab/mine/git/memCompCourse/codes2024/Session2Codes';
-addpath(genpath(dirMod));
-%--------------------------------------------------------------------------
-% create 'unit' u using the unit module, and 'membrane' m using the membrane module 
-u=ComUnit('erg',ComUnit.nm_to_cm(1000),300,ComUnit.kBT_to_erg(10,300)); 
-m=ModMembrane(2,'unit',u);
-%% Plot the membrane 'm'. Note that Matlab autonatically recognize m is an 'object' and apply m's own plot function  
-fig=figure;
+%% Setup
+dir_mod = './';
+addpath(dir_mod);
+
+%% Initialize the membrane object
+u = ComUnit('erg', ComUnit.nm_to_cm(1000), 300, ComUnit.kBT_to_erg(10, 300));
+m = ModMembrane(2, 'unit', u);
+
+%% Create a figure for plotting
+fig = figure;
+
+%% Copy properties for visualization
+m_original = ModMembrane(2, 'unit', u);
+m_original.var = m.var;  
+
+%% Set percentage of vertices to perturb and select vertices
+percentage_to_perturb = 20;  % Percentage of total vertices
+num_vertices = size(m.var.coord, 1);
+num_perturbed = round(num_vertices * percentage_to_perturb / 100);
+perturbed_indices = randperm(num_vertices, num_perturbed);  % Randomly select vertices
+
+%% Apply perturbation in spherical coordinates
+perturbation_magnitude = 0.1;  % Smaller magnitude since this is angular
+
+for idx = perturbed_indices
+    % Convert to spherical coordinates
+    x = m.var.coord(idx, 1);
+    y = m.var.coord(idx, 2);
+    z = m.var.coord(idx, 3);
+    r = sqrt(x^2 + y^2 + z^2);
+    theta = acos(z/r);
+    phi = atan2(y, x);
+
+    % Apply angular perturbation
+    theta_perturbed = theta + perturbation_magnitude * randn();
+    phi_perturbed = phi + perturbation_magnitude * randn();
+
+    % Convert back to Cartesian coordinates
+    x_new = r * sin(theta_perturbed) * cos(phi_perturbed);
+    y_new = r * sin(theta_perturbed) * sin(phi_perturbed);
+    z_new = r * cos(theta_perturbed);
+
+    % Update the coordinates of the perturbed vertex
+    m.var.coord(idx, :) = [x_new, y_new, z_new];
+end
+%% Visualization
+m_original.pm.k_c = 1
+Helfrich_energy_original = Helfrich(m_original);
+H_global_perturbed_origianl = sum(Helfrich_energy_original);
+mean_Helfrich_original = mean(Helfrich_energy_original);
+std_Helfrich_original = std(Helfrich_energy_original);
+fprintf('Mean of Helfrich Bending Energy (before perturbation): %f\n', mean_Helfrich_original);
+fprintf('Standard Deviation of Helfrich Bending Energy (before perturbation): %f\n', std_Helfrich_original);
+fprintf('Global Helfrich Bending Energy (before perturbation): %f\n', H_global_perturbed_origianl);
+
+
 subplot(1,2,1);
-plot(m,'f',fig);
+col=rand(m_original.var.n_coord,3);
+plot(m_original,'f',fig,'col',col,'col_min',0,'col_max',1,'colBar',true);  
+title('Before Perturbation');
+scatter3(m_original.var.coord(perturbed_indices, 1), m_original.var.coord(perturbed_indices, 2), m_original.var.coord(perturbed_indices, 3), ...
+         10, 'red', 'filled');
+m.pm.k_c = 1
+
+Helfrich_energy = Helfrich(m);
+H_global_perturbed = sum(Helfrich_energy);
+mean_Helfrich = mean(Helfrich_energy);
+std_Helfrich= std(Helfrich_energy);
+fprintf('Mean of Helfrich Bending Energy (after perturbation): %f\n', mean_Helfrich);
+fprintf('Standard Deviation of Helfrich Bending Energy (after perturbation): %f\n', std_Helfrich);
+fprintf('Global Helfrich Bending Energy (after perturbation): %f\n', H_global_perturbed);
+
+
 subplot(1,2,2);
 col=rand(m.var.n_coord,3);
-plot(m,'f',fig,'col',col,'col_min',0,'col_max',1,'colBar',true);
-%--------------------------------------------------------------------------
-%% Compute the area, volume, Helfrich bending energy using the provided functions under m
-A=Area(m);
-V=Volume(m);
-r=mean(sqrt(sum(m.var.coord(:,1).^2+m.var.coord(:,2).^2+m.var.coord(:,3).^2,2)));
-fprintf('A: %f, %f\n',sum(A),4*pi*r^2);
-fprintf('V: %f, %f\n',sum(V),4/3*pi*r^3);
+plot(m,'f',fig,'col',col,'col_min',0,'col_max',1,'colBar',true);  
+hold on;
+% Highlight the perturbed vertices
+scatter3(m.var.coord(perturbed_indices, 1), m.var.coord(perturbed_indices, 2), m.var.coord(perturbed_indices, 3), ...
+         10, 'red', 'filled');
+title('After Perturbation');
+
 figure;
-n=10;
-H=zeros(n,1);
-for i=1:n
-    m.pm.k_c=i;
-    H_temp=Helfrich(m);
-    H(i)=sum(H_temp);
-end
-plot((1:n),H,'.'); hold on;
-plot((1:n),(1:n)*8*pi,'-');
-legend('computed H','line with 8\pi slope');
-xlabel('k_c');ylabel('H');
-%% Compute the internal force and potential that regulates the edge length of the triangular meshes
-m.pm.Vdh.V0=0.02; %adjusting the internal force
-[Fi] = Finternal(m,'plot_or_not',true);
-%% Remeshing, blue: edge manipulated, green: replacement edges 
-[~,remeshed,edg_add] = Remesh(m,0,1,[min(Fi.rg),max(Fi.rg)],'plot_or_not',true);
-[~,remeshed,edg_add] = Remesh(m,1,1,[min(Fi.rg),max(Fi.rg)],'plot_or_not',true);
+subplot(2,1,1);
+histogram(Helfrich_energy_original, 30,'Normalization', 'pdf');
+title('PDF of Helfrich Bending Energy (before perturbation)');
+xlabel('Helfrich Bending Energy');
+ylabel('Probability Density');
+
+subplot(2,1,2);
+histogram(Helfrich_energy, 30,'Normalization', 'pdf');
+title('PDF of Helfrich Bending Energy (after perturbation)');
+xlabel('Helfrich Bending Energy');
+ylabel('Probability Density');
+hold off;
