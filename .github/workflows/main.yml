@@ -9,7 +9,12 @@ jobs:
 
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2.2.0
+        with:
+          release: R2024a
+        env:
+          MLM_LICENSE_FILE: ${{ secrets.MLM_LICENSE_FILE }}
 
       - name: Run MATLAB script
-        run: |
-          matlab -batch "run('test.m')"
+        run: matlab -batch "run('test.m')"
+        env:
+          MLM_LICENSE_FILE: ${{ secrets.MLM_LICENSE_FILE }}
