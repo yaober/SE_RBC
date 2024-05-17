@@ -11,15 +11,15 @@ u = ComUnit('erg', ComUnit.nm_to_cm(1000), 300, ComUnit.kBT_to_erg(10, 300));
 m = ModMembrane(2, 'unit', u);
 m.pm.Vdh.V0 = 0.1; % Setting internal force's strength using recommended value
 m.pm.k_c = 5;
-m.pm.k_V = 4;
-m.pm.k_A = 8;
+m.pm.k_V = 8;
+m.pm.k_A = 16;
 m.pm.k_P = 0;
 m.pm.dt = 0.005;
 m.pm.Vdh.V0 = 0.2;
 m.pm.f_const_std_std = 0.001;
 m.pm.kBT = 0.1;
-m.pm.V0 = 150 * 0.6; % 60% of spherical volume
-m.pm.A0 = 137;
+% m.pm.V0 = 150 * 0.6; % 60% of spherical volume
+% m.pm.A0 = 137;
 m.pm.nAVmean = 4;
 m_original = m;
 
@@ -35,13 +35,13 @@ targetSurfaceArea = 1.0 * sum(Area(m_original)); % Set your target surface area 
 fprintf('Target Volume: %f, Surface Area: %f\n', targetVolume, targetSurfaceArea);
 
 kv = 16; % Set appropriate value for kv
-ks = 16; % Set appropriate value for ks
+ks = 32; % Set appropriate value for ks
 
-n_iter = 1000;
+n_iter = 3000;
 stds = zeros(n_iter, 1);
 
 % Perturbation amount for finite difference calculation
-epsilon = 1e-3;
+epsilon = 1e-4;
 
 for iter = 1:n_iter
     % 2. Spatial range for remesh later
@@ -63,14 +63,14 @@ for iter = 1:n_iter
             
             % Perturb positively
             m_update.var.coord(i, dim) = r_orig + epsilon;
-            Ev_before = kv * ((sum(Volume(m_update)) - targetVolume)^2 / targetVolume);
-            Es_before = ks * ((sum(Area(m_update)) - targetSurfaceArea)^2 / targetSurfaceArea);
+            Ev_before = kv * (sum(Volume(m_update)) - targetVolume)^2 / targetVolume;
+            Es_before = ks * (sum(Area(m_update)) - targetSurfaceArea)^2 / targetSurfaceArea;
             Hp = Helfrich(m_update); % Compute Helfrich free energy
             
             % Perturb negatively
             m_update.var.coord(i, dim) = r_orig - epsilon;
-            Ev_after = kv * ((sum(Volume(m_update)) - targetVolume)^2 / targetVolume);
-            Es_after = ks * ((sum(Area(m_update)) - targetSurfaceArea)^2 / targetSurfaceArea);
+            Ev_after = kv * (sum(Volume(m_update)) - targetVolume)^2 / targetVolume;
+            Es_after = ks * (sum(Area(m_update)) - targetSurfaceArea)^2 / targetSurfaceArea;
             Hm = Helfrich(m_update); % Compute Helfrich free energy
             
             % Reset the coordinate
@@ -84,17 +84,17 @@ for iter = 1:n_iter
     end
     
     % Smoothing forces
-    [Fb_smooth, Fv_smooth, Fs_smooth] = smoothForces(Fb, Fv, Fs, m.var.edge_all, m.var.coord);
+    [Fv_smooth, Fs_smooth] = smoothForces(Fv, Fs, m.var.edge_all, m.var.coord);
     
     if mod(iter, 100) == 0
         fig = figure;
-        col = rand(m.var.n_coord, 3);
+        col = m.Helfrich();
         plot(m, 'f', fig, 'col', col, 'col_min', 0, 'col_max', 1, 'colBar', true);
         fprintf('Volume: %f, Surface Area: %f\n', sum(Volume(m)), sum(Area(m)));
     end
     
     % 3. Getting the adaptive time step
-    [dt, Ftotal, l] = varDt(m, Fi, Fb_smooth + Fv_smooth + Fs_smooth, mu);
+    [dt, Ftotal, l] = varDt(m, Fi, Fb + Fv_smooth + Fs_smooth, mu);
     m.var.coord = m.var.coord + m.pm.mu * Ftotal * dt;
     
     % 4. Remeshing
@@ -107,15 +107,14 @@ plot(1:n_iter, stds);
 % Plot the membrane 'm'
 fig = figure;
 subplot(1, 2, 1);
-col = rand(m_original.var.n_coord, 3);
+col = m_original.Helfrich();
 plot(m_original, 'f', fig, 'col', col, 'col_min', 0, 'col_max', 1, 'colBar', true);
 subplot(1, 2, 2);
-col = rand(m.var.n_coord, 3);
+col = m.Helfrich();
 plot(m, 'f', fig, 'col', col, 'col_min', 0, 'col_max', 1, 'colBar', true);
 
 % Smoothing function
-function [Fb_smooth, Fv_smooth, Fs_smooth] = smoothForces(Fb, Fv, Fs, edge_all, coord)
-    Fb_smooth = zeros(size(coord));
+function [Fv_smooth, Fs_smooth] = smoothForces(Fv, Fs, edge_all, coord)
     Fv_smooth = zeros(size(coord));
     Fs_smooth = zeros(size(coord));
     for i = 1:size(coord, 1)
